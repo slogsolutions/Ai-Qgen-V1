@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI_Qgen | AI Powered Exam Generation</title>
+    <link rel="stylesheet" href="style.css?v=5">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-accents">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+    
+    <nav class="navbar">
+        <div class="logo">AI<span>_Qgen</span></div>
+        <ul class="nav-links">
+            <li><a href="#" id="navDashboard">Dashboard</a></li>
+            <li><a href="#" id="navHistory">History</a></li>
+            <li><a href="#" id="openSettings">⚙️ Settings</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <header class="hero">
+            <h1>Bilingual AI Question Generator</h1>
+            <p>Generate high-quality exam papers in English and Hindi directly from your syllabus with anti-repetition technology.</p>
+        </header>
+
+        <div id="dashboardView">
+            <section class="glass-panel main-form">
+                <h2>Add Subject Metadata</h2>
+            <form id="subjectForm">
+                <div class="input-group" style="display: flex; flex-direction: row; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label>Subject Code</label>
+                        <input type="text" id="subCode" placeholder="e.g. CS101" style="width: 100%;" required>
+                    </div>
+                    <div style="flex: 2;">
+                        <label>Subject Name</label>
+                        <input type="text" id="subName" placeholder="e.g. Data Structures" style="width: 100%;" required>
+                    </div>
+                </div>
+                <div class="input-group" style="display: flex; flex-direction: row; gap: 15px;">
+                    <div style="flex: 2;">
+                        <label>Branch Name</label>
+                        <input type="text" id="branchName" placeholder="e.g. Computer Science" style="width: 100%;" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Branch Code</label>
+                        <input type="text" id="branchCode" placeholder="e.g. CSE" style="width: 100%;" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Sem / Year</label>
+                        <input type="text" id="semYear" placeholder="e.g. 3rd Sem" style="width: 100%;" required>
+                    </div>
+                </div>
+                <div class="input-group" style="display: flex; flex-direction: row; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label>Exam Title</label>
+                        <input type="text" id="examTitle" placeholder="e.g. Mid Term" style="width: 100%;" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Exam Year</label>
+                        <input type="text" id="examYear" placeholder="e.g. 2026" style="width: 100%;" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn secondary-btn">Register Subject</button>
+            </form>
+            <div id="subjectStatus" class="status-msg"></div>
+        </section>
+
+        <section class="glass-panel main-form">
+            <h2>Generate New Question Bank</h2>
+            <form id="genForm">
+                <div class="input-group">
+                    <label>Select Subject</label>
+                    <select id="subjectId" required>
+                        <option value="">Loading subjects...</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Upload Syllabus (PDF)</label>
+                    <input type="file" id="syllabusPdf" accept=".pdf" required>
+                </div>
+                <div class="input-group">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Question Requirements (Target Quantities)</span>
+                        <button type="button" id="addGenReqBtn" class="btn outline-btn" style="padding: 2px 8px; font-size: 0.8rem;">+ Add Type</button>
+                    </label>
+                    <div id="genTypesContainer" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Dynamic gen types go here -->
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Difficulty</label>
+                    <select id="difficulty">
+                        <option value="Easy">Easy</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="Hard">Hard</option>
+                    </select>
+                </div>
+
+                <div class="input-group" style="display: flex; gap: 15px; margin-top: 10px;">
+                    <div style="flex: 1;">
+                        <label>AI Provider</label>
+                        <select id="aiProvider">
+                            <option value="groq">Groq (Cloud)</option>
+                            <option value="ollama">Ollama (Local)</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>AI Model</label>
+                        <select id="aiModel"></select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn primary-btn" style="margin-top: 20px;">
+                    <span class="btn-text">Generate Questions (AI)</span>
+                    <span class="loader hidden"></span>
+                </button>
+            </form>
+            <div id="genStatus" class="status-msg"></div>
+        </section>
+
+        <section class="glass-panel paper-form">
+            <h2>Create Question Paper</h2>
+            <form id="paperForm">
+                <div class="input-group">
+                    <label>Subject</label>
+                    <select id="paperSubjectId" required></select>
+                </div>
+                <div id="dynamicSections">
+                    <!-- Dynamic sections go here -->
+                </div>
+                <button type="button" id="addSectionBtn" class="btn outline-btn" style="margin-bottom: 20px;">+ Add Section</button>
+                
+                <button type="submit" class="btn secondary-btn">Compile Exam File</button>
+            </form>
+            <div id="paperStatus" class="status-msg"></div>
+            <div id="downloadLinks" class="download-links hidden">
+                <a href="#" id="docxLink" class="download-card docx" download>Download DOCX Paper</a>
+                <a href="#" id="ansLink" class="download-card pdf" download>Download Answer Key</a>
+            </div>
+            </section>
+        </div>
+
+        <div id="historyView" class="hidden">
+            <section class="glass-panel text-center" style="text-align: center; padding: 40px;">
+                <h2>Generation History</h2>
+                <p>All previously generated question papers will appear here in future updates.</p>
+            </section>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content glass-panel">
+            <span id="closeSettings" class="close">&times;</span>
+            <h2>System Settings</h2>
+            <form id="settingsForm">
+                <div class="input-group">
+                    <label>Database Configuration</label>
+                    <small>Choose between local PostgreSQL or remote Supabase URL</small>
+                    <input type="text" id="dbUrl" placeholder="postgresql://..." required style="width: 100%; margin-top: 10px;">
+                </div>
+                <button type="submit" class="btn secondary-btn">Save Configurations</button>
+                <div id="settingsStatus" class="status-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js?v=5"></script>
+</body>
+</html>
