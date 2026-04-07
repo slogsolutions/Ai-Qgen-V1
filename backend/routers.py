@@ -103,6 +103,9 @@ async def generate_from_pdf(
     type_counts = {}
     
     for q_data in generated:
+        if not isinstance(q_data, dict):
+            continue
+            
         # Extract q_type and options from model response if available
         # Default to "Mixed" if model didn't return one
         actual_q_type = q_data.get("q_type", "Mixed")

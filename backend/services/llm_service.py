@@ -128,13 +128,71 @@ Correct format:
 Question in English.
 प्रश्न हिंदी में।
 
-6. MCQ OPTIONS FORMAT (MANDATORY)
-- Each option MUST be bilingual in ONE LINE:
-  English / Hindi
-- Use EXACTLY one forward slash: "/"
-- English MUST come BEFORE "/"
-- Hindi MUST come AFTER "/"
-- Both must have the SAME meaning.
+6. MCQ OPTIONS FORMAT ENFORCEMENT (STRICT)
+
+You MUST generate ALL MCQ options in a strictly bilingual format.
+
+MANDATORY FORMAT:
+Each option MUST be written in ONE line as:
+English / Hindi
+
+STRICT RULES:
+1. Use EXACTLY one forward slash "/"
+2. English text MUST appear BEFORE "/"
+3. Hindi text MUST appear AFTER "/"
+4. Hindi MUST be in Devanagari script
+5. Both English and Hindi MUST have the SAME meaning
+
+EXAMPLE (CORRECT):
+A. Apple / सेब
+B. Mango / आम
+C. Banana / केला
+D. Orange / संतरा
+
+FORBIDDEN OUTPUT (AUTO-INVALID)
+
+- Missing Hindi:
+  Apple
+
+- Missing English:
+  सेब
+
+- Wrong separator:
+  Apple - सेब
+  Apple | सेब
+
+- Multiple slashes:
+  Apple / सेब / fruit
+
+- Meaning mismatch:
+  Apple / आम
+
+- Mixed compliance:
+  (Some options bilingual, others not)
+
+CRITICAL ENFORCEMENT
+
+- ALL options MUST be correctly formatted.
+- If EVEN ONE option violates the rule:
+  → The ENTIRE MCQ is INVALID
+  → You MUST regenerate ALL options
+
+SELF-VALIDATION (MANDATORY)
+
+Before output, you MUST verify for EACH option:
+- Contains exactly one "/"
+- English before "/"
+- Hindi after "/"
+- Correct translation   
+
+If ANY check fails:
+- REGENERATE internally
+- DO NOT output invalid content
+
+FINAL INSTRUCTION
+
+Do NOT output partially correct MCQs.
+ONLY output when ALL options are 100% compliant.
 
 Correct example:
 A. Apple / सेब
@@ -254,10 +312,13 @@ Context Chunk:
                         chunk_qs = v
                         break
                         
-            all_qs.extend(chunk_qs)
+            # Filter safely
+            valid_qs = [q for q in chunk_qs if isinstance(q, dict)]
+            
+            all_qs.extend(valid_qs)
             
             # Dynamically deduct successfully extracted questions to fix under-generation
-            for q in chunk_qs:
+            for q in valid_qs:
                 qt = q.get("q_type", "Mixed")
                 if qt in remaining_targets:
                     remaining_targets[qt] -= 1
