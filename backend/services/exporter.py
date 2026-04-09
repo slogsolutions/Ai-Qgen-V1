@@ -151,9 +151,14 @@ def export_paper_docx(sections_data: dict, section_meta: dict, subject_info: dic
                 doc.add_paragraph(f"Q{q_counter}. {q_item['q']}")
                 options = q_item.get("options")
                 if options:
-                    for k, v in options.items():
-                        p = doc.add_paragraph(f"{k}) {v}")
-                        p.paragraph_format.left_indent = Pt(20)
+                    if isinstance(options, dict):
+                        for k, v in options.items():
+                            p = doc.add_paragraph(f"{k}) {v}")
+                            p.paragraph_format.left_indent = Pt(20)
+                    elif isinstance(options, list):
+                        for opt in options:
+                            p = doc.add_paragraph(str(opt))
+                            p.paragraph_format.left_indent = Pt(20)
             else:
                 doc.add_paragraph(f"Q{q_counter}: {q_item['q']}")
                 doc.add_paragraph(f"Ans: {q_item['a']}")

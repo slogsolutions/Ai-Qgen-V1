@@ -59,9 +59,16 @@ def generate_questions(subject_context: str, types_config: list, difficulty: str
         if nq > 0:
             remaining_targets[qt] = remaining_targets.get(qt, 0) + nq
             
-    for i, chunk in enumerate(chunks):
+    MAX_RETRIES = 5
+    execution_chunks = chunks * MAX_RETRIES
+            
+    for i_exec, chunk in enumerate(execution_chunks):
+        if sum(remaining_targets.values()) <= 0:
+            break
+            
         chunk_types = []
-        chunks_left = num_chunks - i
+        current_pass_i = i_exec % num_chunks
+        chunks_left = num_chunks - current_pass_i
         
         for qt, nq in remaining_targets.items():
             if nq <= 0: continue
@@ -296,10 +303,10 @@ Context Chunk:
                     try:
                         data = json.loads(salvaged)
                     except Exception:
-                        print(f"Chunk {i+1} parsing failed. Error: {decode_err}")
+                        print(f"Chunk {current_pass_i+1} (Pass {i_exec//num_chunks + 1}) parsing failed. Error: {decode_err}")
                         continue
                 else:
-                    print(f"Chunk {i+1} Decode Error: {decode_err}")
+                    print(f"Chunk {current_pass_i+1} (Pass {i_exec//num_chunks + 1}) Decode Error: {decode_err}")
                     continue
 
             # Extract lists
@@ -324,10 +331,10 @@ Context Chunk:
                     remaining_targets[qt] -= 1
                 
         except Exception as e:
-            print(f"Error processing chunk {i+1} with LLM: {str(e)}")
+            print(f"Error processing chunk {current_pass_i+1} (Pass {i_exec//num_chunks + 1}) with LLM: {str(e)}")
             continue
 
     if not all_qs:
-        raise ValueError("Complete failure across all PDF chunks. No LLM questions generated successfully.")
+        raise ValueError("Token Limit Reached or Complete failure across all PDF chunks. No LLM questions generated successfully.")
         
     return all_qs

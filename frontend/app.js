@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const nq = item.querySelector(".gt-num").value;
             typeConfigs.push({ q_type: qt, num_q: parseInt(nq) });
         });
-        
+
         if (typeConfigs.length === 0) {
             alert("Please add at least one question requirement type.");
             return;
@@ -183,13 +183,13 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `;
         dynamicSections.appendChild(div);
-        
+
         const btn = div.querySelector('.add-pool-btn');
         btn.addEventListener('click', (e) => {
             const containerId = e.target.getAttribute('data-target');
             addPoolToSection(document.getElementById(containerId));
         });
-        
+
         addPoolToSection(document.getElementById(sectionId)); // Auto add first pool
     }
 
@@ -227,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const secName = item.querySelector(".sec-title").value;
             const attempt = item.querySelector(".sec-attempt").value;
             const marks = item.querySelector(".sec-marks").value;
-            
+
             const typesConfig = [];
             let totalQ = 0;
             const pools = item.querySelectorAll(".pool-item");
@@ -357,8 +357,6 @@ async function loadSubjects() {
     try {
         const res = await fetch(`${API_BASE}/subjects/`);
         if (!res.ok) {
-            // Seed a mock subject for testing if db is empty or failed
-            seedMockSubject();
             return;
         }
         const subjects = await res.json();
@@ -369,15 +367,11 @@ async function loadSubjects() {
         sel1.innerHTML = '<option value="">Select a subject</option>';
         sel2.innerHTML = '<option value="">Select a subject</option>';
 
-        if (subjects.length === 0) {
-            seedMockSubject();
-        } else {
-            subjects.forEach(sub => {
-                const opt = `<option value="${sub.id}">${sub.code} - ${sub.name}</option>`;
-                sel1.innerHTML += opt;
-                sel2.innerHTML += opt;
-            });
-        }
+        subjects.forEach(sub => {
+            const opt = `<option value="${sub.id}">${sub.code} - ${sub.name}</option>`;
+            sel1.innerHTML += opt;
+            sel2.innerHTML += opt;
+        });
     } catch (err) {
         console.error("Could not load subjects, ensure backend is running.");
     }
