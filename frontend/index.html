@@ -17,6 +17,7 @@
         <div class="logo">AI<span>_Qgen</span></div>
         <ul class="nav-links">
             <li><a href="#" id="navDashboard">Dashboard</a></li>
+            <li><a href="#" id="navAnalytics">Analytics</a></li>
             <li><a href="#" id="navHistory">History</a></li>
             <li><a href="#" id="openSettings">⚙️ Settings</a></li>
         </ul>
@@ -58,12 +59,8 @@
                 </div>
                 <div class="input-group" style="display: flex; flex-direction: row; gap: 15px;">
                     <div style="flex: 1;">
-                        <label>Exam Title</label>
-                        <input type="text" id="examTitle" placeholder="e.g. Mid Term" style="width: 100%;" required>
-                    </div>
-                    <div style="flex: 1;">
-                        <label>Exam Year</label>
-                        <input type="text" id="examYear" placeholder="e.g. 2026" style="width: 100%;" required>
+                        <label>Year</label>
+                        <input type="text" id="subjectYear" placeholder="e.g. 2026" style="width: 100%;" required>
                     </div>
                 </div>
                 <button type="submit" class="btn secondary-btn">Register Subject</button>
@@ -127,9 +124,48 @@
         <section class="glass-panel paper-form">
             <h2>Create Question Paper</h2>
             <form id="paperForm">
-                <div class="input-group">
-                    <label>Subject</label>
-                    <select id="paperSubjectId" required></select>
+                <div class="input-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 2;">
+                        <label>Subject</label>
+                        <select id="paperSubjectId" required></select>
+                    </div>
+                    <div style="flex: 2;">
+                        <label>Exam Title (Prints on Header)</label>
+                        <input type="text" id="paperExamTitle" placeholder="e.g. Mid Term" required style="width: 100%;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Exam Type</label>
+                        <select id="paperExamType" required style="width: 100%;">
+                            <option value="Main">Main</option>
+                            <option value="Back">Back</option>
+                            <option value="Special Back">Special Back</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Mini Analytics Preview -->
+                <div id="paperAnalyticsPreview" class="hidden" style="margin-bottom: 20px; border: 1px dashed var(--glass-border); padding: 15px; border-radius: 12px; background: rgba(255,255,255,0.02);">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Question Pool Availability</span>
+                        <span id="paperSubjectHealth" class="status-indicator" style="font-size: 0.65rem;">Unknown</span>
+                    </div>
+                    <!-- Header-style Stats -->
+                    <div class="subject-health-header" style="padding: 10px; margin-bottom: 15px; background: rgba(0,0,0,0.1);">
+                        <div class="health-stat">
+                            <span class="val" id="paperTotalPool" style="font-size: 1.1rem;">0</span>
+                            <span class="lbl" style="font-size: 0.65rem;">Total Pool</span>
+                        </div>
+                        <div class="health-stat">
+                            <span class="val" id="paperTotalUsed" style="font-size: 1.1rem;">0</span>
+                            <span class="lbl" style="font-size: 0.65rem;">Used</span>
+                        </div>
+                        <div class="health-stat">
+                            <span class="val" id="paperOverallConsumption" style="font-size: 1.1rem;">0%</span>
+                            <span class="lbl" style="font-size: 0.65rem;">Rate</span>
+                        </div>
+                    </div>
+                    <div id="paperTypeStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+                        <!-- Mini cards will go here -->
+                    </div>
                 </div>
                 <div id="dynamicSections">
                     <!-- Dynamic sections go here -->
@@ -143,6 +179,41 @@
                 <a href="#" id="docxLink" class="download-card docx" download>Download DOCX Paper</a>
                 <a href="#" id="ansLink" class="download-card pdf" download>Download Answer Key</a>
             </div>
+            </section>
+        </div>
+
+        <div id="analyticsView" class="hidden">
+            <section class="glass-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Question Analytics</h2>
+                    <select id="analyticsSubjectFilter" style="padding: 8px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white;">
+                        <option value="">Select Subject</option>
+                    </select>
+                </div>
+                
+                <div id="analyticsContent" class="hidden">
+                    <div class="subject-health-header">
+                        <div class="health-stat">
+                            <span class="val" id="totalQuestionsCount">0</span>
+                            <span class="lbl">Total Pool</span>
+                        </div>
+                        <div class="health-stat">
+                            <span class="val" id="totalUsedCount">0</span>
+                            <span class="lbl">Used Questions</span>
+                        </div>
+                        <div class="health-stat">
+                            <span class="val" id="overallConsumption">0%</span>
+                            <span class="lbl">Consumption Rate</span>
+                        </div>
+                    </div>
+
+                    <div id="typeBreakdown" class="breakdown-grid" style="margin-top: 25px;">
+                        <!-- Dynamic analytics cards go here -->
+                    </div>
+                </div>
+                <div id="analyticsEmpty" style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+                    Select a subject to view detailed question analytics and consumption tracking.
+                </div>
             </section>
         </div>
 
@@ -171,6 +242,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>
