@@ -191,7 +191,7 @@ def generate_paper(request: schemas.PaperGenerationRequest, db: Session = Depend
         
         sec_items = []
         for tc in section.types_config:
-            questions = paper_generator.build_paper(db, request.subject_id, tc.num_q, tc.q_type)
+            questions = paper_generator.build_paper(db, request.subject_id, tc.num_q, tc.q_type, exam_code=exam_code)
             
             for q in questions:
                 merged_q = f"{q.question_en} / {q.question_hi}"

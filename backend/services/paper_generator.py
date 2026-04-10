@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from .. import models
 import random
 
-def build_paper(db: Session, subject_id: int, total_questions: int, q_type: str = "MCQ"):
+def build_paper(db: Session, subject_id: int, total_questions: int, q_type: str = "MCQ", exam_code: str = None):
     """
     Selects valid questions for a paper based on anti-repetition logic.
     Prioritizes questions with the lowest usage_count.
@@ -40,6 +40,8 @@ def build_paper(db: Session, subject_id: int, total_questions: int, q_type: str 
     # 5. Update usage counters
     for q in selected:
         q.usage_count += 1
+        if exam_code:
+            q.exam_code = exam_code
     
     db.commit()
 
