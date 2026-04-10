@@ -6,16 +6,26 @@ from .database import Base
 class Subject(Base):
     __tablename__ = "subjects"
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String, index=True)
+    subject_code = Column(String, unique=True, index=True)
     name = Column(String)
     branch_name = Column(String)
     branch_code = Column(String)
     sem_year = Column(String)
-    exam_title = Column(String)
-    exam_year = Column(String)
+    year = Column(String)
     
     questions = relationship("Question", back_populates="subject", cascade="all, delete-orphan")
     papers = relationship("Paper", back_populates="subject", cascade="all, delete-orphan")
+
+class Examination(Base):
+    __tablename__ = "examinations"
+    id = Column(Integer, primary_key=True, index=True)
+    branch = Column(String)
+    branch_code = Column(String)
+    exam_code = Column(String, unique=True, index=True)
+    exam_title = Column(String)
+    subject = Column(String)
+    subject_code = Column(String)
+    exam_type = Column(String)
 
 class Question(Base):
     __tablename__ = "questions"
@@ -29,6 +39,7 @@ class Question(Base):
     answer_hi = Column(Text)
     options = Column(Text, nullable=True) # JSON stored options
     usage_count = Column(Integer, default=0)
+    exam_code = Column(String, index=True, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     subject = relationship("Subject", back_populates="questions")

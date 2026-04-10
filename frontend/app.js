@@ -11,18 +11,28 @@ document.addEventListener("DOMContentLoaded", () => {
         status.textContent = "Saving...";
         status.style.color = "inherit";
         try {
+            const getVal = (id) => {
+                const el = document.getElementById(id);
+                if (!el) {
+                    console.error(`Missing element: ${id}`);
+                    throw new Error(`System Error: ID '${id}' not found in page.`);
+                }
+                return el.value;
+            };
+
+            const payload = {
+                subject_code: getVal("subCode"),
+                name: getVal("subName"),
+                branch_name: getVal("branchName"),
+                branch_code: getVal("branchCode"),
+                sem_year: getVal("semYear"),
+                year: getVal("subjectYear")
+            };
+
             const res = await fetch(`${API_BASE}/subjects/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    code: document.getElementById("subCode").value,
-                    name: document.getElementById("subName").value,
-                    branch_name: document.getElementById("branchName").value,
-                    branch_code: document.getElementById("branchCode").value,
-                    sem_year: document.getElementById("semYear").value,
-                    exam_title: document.getElementById("examTitle").value,
-                    exam_year: document.getElementById("examYear").value
-                })
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
                 status.style.color = "#4ade80";
@@ -262,6 +272,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 body: JSON.stringify({
                     subject_id: parseInt(subjectId),
+                    exam_title: document.getElementById("paperExamTitle").value,
+                    exam_type: document.getElementById("paperExamType").value,
                     total_marks: 100,
                     sections_config: sectionsConfig
                 })
@@ -336,22 +348,221 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Navigation logic
     const navDashboard = document.getElementById("navDashboard");
+    const navAnalytics = document.getElementById("navAnalytics");
     const navHistory = document.getElementById("navHistory");
+    
     const dashboardView = document.getElementById("dashboardView");
+    const analyticsView = document.getElementById("analyticsView");
     const historyView = document.getElementById("historyView");
+
+    function hideAllViews() {
+        dashboardView.classList.add("hidden");
+        analyticsView.classList.add("hidden");
+        historyView.classList.add("hidden");
+    }
 
     navDashboard.addEventListener("click", (e) => {
         e.preventDefault();
+        hideAllViews();
         dashboardView.classList.remove("hidden");
-        historyView.classList.add("hidden");
+    });
+
+    navAnalytics.addEventListener("click", (e) => {
+        e.preventDefault();
+        hideAllViews();
+        analyticsView.classList.remove("hidden");
     });
 
     navHistory.addEventListener("click", (e) => {
         e.preventDefault();
+        hideAllViews();
         historyView.classList.remove("hidden");
-        dashboardView.classList.add("hidden");
     });
+
+    // Analytics Filtering logic
+    const analyticsSubjectFilter = document.getElementById("analyticsSubjectFilter");
+    analyticsSubjectFilter.addEventListener("change", () => {
+        const subCode = analyticsSubjectFilter.value;
+        if (subCode) {
+            loadAnalytics(subCode);
+        } else {
+            document.getElementById("analyticsContent").classList.add("hidden");
+            document.getElementById("analyticsEmpty").classList.remove("hidden");
+        }
+    });
+    
+    const paperSubjectId = document.getElementById("paperSubjectId");
+    paperSubjectId.addEventListener("change", async () => {
+        const subId = paperSubjectId.value;
+        const preview = document.getElementById("paperAnalyticsPreview");
+        if (!subId) {
+            preview.classList.add("hidden");
+            return;
+        }
+
+        // We need the subject_code for the analytics API
+        // Quick find from the select option text (or we could have stored it in a map)
+        const selectedOption = paperSubjectId.options[paperSubjectId.selectedIndex].text;
+        const subCode = selectedOption.split(" - ")[0];
+        
+        try {
+            const res = await fetch(`${API_BASE}/analytics/subject/${subCode}`);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            renderMiniAnalytics(data);
+            preview.classList.remove("hidden");
+        } catch (e) {
+            preview.classList.add("hidden");
+        }
+    });
+
+    function renderMiniAnalytics(data) {
+        const container = document.getElementById("paperTypeStats");
+        const health = document.getElementById("paperSubjectHealth");
+        container.innerHTML = "";
+        
+        let totalLimit = 0;
+        let totalHeld = 0;
+
+        const typeLabels = {
+            "MCQ": "Multiple Choice (MCQs)",
+            "FIB": "Fill in the Blanks",
+            "T/F": "True / False",
+            "SA": "Short Answer",
+            "LA": "Long Answer",
+            "CASE": "Case-Based Questions"
+        };
+
+        Object.entries(data.breakdown).forEach(([type, stats]) => {
+            totalLimit += stats.total;
+            totalHeld += stats.used;
+            
+            if (stats.total > 0) {
+                const perc = (stats.used / stats.total) * 100;
+                const remaining = stats.total - stats.used;
+                
+                // Determine Status
+                let statusText = "High Supply";
+                let statusClass = "status-high";
+                if (perc > 80) {
+                    statusText = "Critical";
+                    statusClass = "status-critical";
+                } else if (perc > 50) {
+                    statusText = "Moderate";
+                    statusClass = "status-moderate";
+                }
+
+                const div = document.createElement("div");
+                div.className = "analytics-item-card"; // Reusing the same card style
+                div.style.padding = "12px"; // Slightly tighter for the preview
+                div.innerHTML = `
+                    <div class="analytics-item-header" style="font-size: 0.8rem; margin-bottom: 8px;">
+                        <span>${typeLabels[type] || type}</span>
+                        <span class="status-indicator ${statusClass}" style="font-size: 0.55rem; padding: 2px 6px;">${statusText}</span>
+                    </div>
+                    <div style="margin-bottom: 8px; font-weight: 600; color: var(--primary); font-size: 0.85rem;">
+                        ${stats.used} / ${stats.total} <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">(${remaining} remaining)</span>
+                    </div>
+                    <div class="progress-container" style="height: 6px; margin-bottom: 6px;">
+                        <div class="progress-bar" style="width: ${perc}%; background: ${perc > 80 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--secondary))'};"></div>
+                    </div>
+                    <div class="percentage-label" style="font-size: 0.7rem;">${perc.toFixed(0)}% consumed</div>
+                `;
+                container.appendChild(div);
+            }
+        });
+
+        const overall = totalLimit > 0 ? (totalHeld / totalLimit) * 100 : 0;
+        
+        document.getElementById("paperTotalPool").textContent = totalLimit;
+        document.getElementById("paperTotalUsed").textContent = totalHeld;
+        document.getElementById("paperOverallConsumption").textContent = overall.toFixed(1) + "%";
+
+        if (overall > 80) {
+            health.textContent = "Low Inventory";
+            health.className = "status-indicator status-critical";
+        } else if (overall > 50) {
+            health.textContent = "Fair Supply";
+            health.className = "status-indicator status-moderate";
+        } else {
+            health.textContent = "Healthy Pool";
+            health.className = "status-indicator status-high";
+        }
+    }
 });
+
+async function loadAnalytics(subjectCode) {
+    const content = document.getElementById("analyticsContent");
+    const empty = document.getElementById("analyticsEmpty");
+    const typeBreakdown = document.getElementById("typeBreakdown");
+    
+    try {
+        const res = await fetch(`${API_BASE}/analytics/subject/${subjectCode}`);
+        if (!res.ok) throw new Error("Failed to load analytics");
+        const data = await res.json();
+        
+        // Summary stats
+        let grandTotal = 0;
+        let grandUsed = 0;
+        
+        const typeLabels = {
+            "MCQ": "Multiple Choice (MCQs)",
+            "FIB": "Fill in the Blanks",
+            "T/F": "True / False",
+            "SA": "Short Answer",
+            "LA": "Long Answer",
+            "CASE": "Case-Based Questions"
+        };
+        
+        typeBreakdown.innerHTML = "";
+        Object.entries(data.breakdown).forEach(([type, stats]) => {
+            grandTotal += stats.total;
+            grandUsed += stats.used;
+            
+            const remaining = stats.total - stats.used;
+            const perc = stats.total > 0 ? ((stats.used / stats.total) * 100).toFixed(0) : 0;
+            
+            // Determine Status
+            let statusText = "High Supply";
+            let statusClass = "status-high";
+            if (perc > 80) {
+                statusText = "Critical";
+                statusClass = "status-critical";
+            } else if (perc > 50) {
+                statusText = "Moderate";
+                statusClass = "status-moderate";
+            }
+            
+            const card = document.createElement("div");
+            card.className = "analytics-item-card";
+            card.innerHTML = `
+                <div class="analytics-item-header">
+                    <span>${typeLabels[type] || type}</span>
+                    <span class="status-indicator ${statusClass}">${statusText}</span>
+                </div>
+                <div style="margin-bottom: 10px; font-weight: 600; color: var(--primary);">
+                    ${stats.used} / ${stats.total} <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">(${remaining} remaining)</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: ${perc}%; background: ${perc > 80 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--secondary))'};"></div>
+                </div>
+                <div class="percentage-label">${perc}% consumed</div>
+            `;
+            typeBreakdown.appendChild(card);
+        });
+        
+        document.getElementById("totalQuestionsCount").textContent = grandTotal;
+        document.getElementById("totalUsedCount").textContent = grandUsed;
+        const overallRate = grandTotal > 0 ? ((grandUsed / grandTotal) * 100).toFixed(1) : 0;
+        document.getElementById("overallConsumption").textContent = overallRate + "%";
+        
+        content.classList.remove("hidden");
+        empty.classList.add("hidden");
+    } catch (err) {
+        console.error(err);
+        alert("Error loading analytics: " + err.message);
+    }
+}
 
 async function loadSubjects() {
     try {
@@ -363,14 +574,19 @@ async function loadSubjects() {
 
         const sel1 = document.getElementById("subjectId");
         const sel2 = document.getElementById("paperSubjectId");
+        const sel3 = document.getElementById("analyticsSubjectFilter");
 
         sel1.innerHTML = '<option value="">Select a subject</option>';
         sel2.innerHTML = '<option value="">Select a subject</option>';
+        sel3.innerHTML = '<option value="">Select a subject</option>';
 
         subjects.forEach(sub => {
-            const opt = `<option value="${sub.id}">${sub.code} - ${sub.name}</option>`;
+            const opt = `<option value="${sub.id}">${sub.subject_code} - ${sub.name}</option>`;
             sel1.innerHTML += opt;
             sel2.innerHTML += opt;
+            
+            const optAn = `<option value="${sub.subject_code}">${sub.subject_code} - ${sub.name}</option>`;
+            sel3.innerHTML += optAn;
         });
     } catch (err) {
         console.error("Could not load subjects, ensure backend is running.");
@@ -383,13 +599,12 @@ async function seedMockSubject() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                code: "CS101",
+                subject_code: "CS101",
                 name: "Computer Science",
                 branch_name: "B.Tech",
                 branch_code: "CSE",
                 sem_year: "1st Year",
-                exam_title: "Mid Term",
-                exam_year: "2026"
+                year: "2026"
             })
         });
         // reload safely
@@ -397,12 +612,16 @@ async function seedMockSubject() {
         const subjects = await res.json();
         const sel1 = document.getElementById("subjectId");
         const sel2 = document.getElementById("paperSubjectId");
+        const sel3 = document.getElementById("analyticsSubjectFilter");
         sel1.innerHTML = '<option value="">Select a subject</option>';
         sel2.innerHTML = '<option value="">Select a subject</option>';
+        sel3.innerHTML = '<option value="">Select a subject</option>';
         subjects.forEach(sub => {
-            const opt = `<option value="${sub.id}">${sub.code} - ${sub.name}</option>`;
+            const opt = `<option value="${sub.id}">${sub.subject_code} - ${sub.name}</option>`;
             sel1.innerHTML += opt;
             sel2.innerHTML += opt;
+            const optAn = `<option value="${sub.subject_code}">${sub.subject_code} - ${sub.name}</option>`;
+            sel3.innerHTML += optAn;
         });
     } catch (e) { }
 }

@@ -4,8 +4,7 @@ from . import models
 from .database import engine
 
 # Create DB tables
-# We will use alembic eventually, but to be sure for dev
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine) # Disabling in favor of Alembic migrations
 
 app = FastAPI(title="AI_Qgen API")
 

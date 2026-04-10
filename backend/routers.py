@@ -7,6 +7,8 @@ from .services import pdf_extractor, llm_service, paper_generator, exporter, mod
 import json
 import os
 import re
+import datetime
+import random
 
 router = APIRouter()
 
@@ -153,6 +155,29 @@ def generate_paper(request: schemas.PaperGenerationRequest, db: Session = Depend
     subject = db.query(models.Subject).filter(models.Subject.id == request.subject_id).first()
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
+
+    # Generate Examination Code safely
+    month_suffix = datetime.datetime.now().strftime("%b").upper()
+    
+    # Extract shortcode for Exam Type
+    type_map = {"Main": "M", "Back": "B", "Special Back": "SB"}
+    type_suffix = type_map.get(request.exam_type, "M")
+    
+    # Append random integers to prevent breaking uniqueness constraint if users compile multiple exact matches
+    rand_id = random.randint(10000, 99999)
+    exam_code = f"{subject.subject_code}-{month_suffix}-{type_suffix}-{rand_id}"
+    
+    # Create the Examination Registry Record
+    db_exam = models.Examination(
+        branch=subject.branch_name,
+        branch_code=subject.branch_code,
+        exam_code=exam_code,
+        exam_title=request.exam_title,
+        subject=subject.name,
+        subject_code=subject.subject_code,
+        exam_type=request.exam_type
+    )
+    db.add(db_exam)
         
     sections_json = {}
     section_meta = {}
@@ -193,9 +218,9 @@ def generate_paper(request: schemas.PaperGenerationRequest, db: Session = Depend
         calculated_total_marks = int(calculated_total_marks)
         
     subject_info = {
-        "exam_title": subject.exam_title,
+        "exam_title": request.exam_title,
         "subject_name": subject.name,
-        "subject_code": subject.code,
+        "subject_code": subject.subject_code,
         "branch_name": subject.branch_name,
         "branch_code": subject.branch_code,
         "sem_year": subject.sem_year,
@@ -205,7 +230,7 @@ def generate_paper(request: schemas.PaperGenerationRequest, db: Session = Depend
     paper_path = exporter.export_paper_docx(sections_json, section_meta, subject_info, is_answer_key=False)
     ans_path = exporter.export_paper_docx(sections_json, section_meta, subject_info, is_answer_key=True)
     
-    # Save paper record
+    # Save paper record (now storing exam_title context via the document itself)
     paper = models.Paper(
         subject_id=subject.id,
         status="completed",
@@ -216,3 +241,39 @@ def generate_paper(request: schemas.PaperGenerationRequest, db: Session = Depend
     db.commit()
     
     return {"message": "Paper generated successfully", "paper_file": paper_path, "ans_key_file": ans_path}
+
+@router.get("/analytics/subject/{subject_code}", response_model=schemas.SubjectAnalyticsResponse)
+def get_subject_analytics(subject_code: str, db: Session = Depends(get_db)):
+    subject = db.query(models.Subject).filter(models.Subject.subject_code == subject_code).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+        
+    questions = db.query(models.Question).filter(models.Question.subject_id == subject.id).all()
+    
+    total_q = len(questions)
+    breakdown = {}
+    
+    q_types = ["MCQ", "FIB", "T/F", "SA", "LA", "CASE"]
+    for qt in q_types:
+        type_qs = [q for q in questions if q.q_type == qt]
+        total = len(type_qs)
+        used = len([q for q in type_qs if q.usage_count > 0])
+        breakdown[qt] = {"total": total, "used": used}
+        
+    return {
+        "subject_code": subject_code,
+        "total_questions": total_q,
+        "breakdown": breakdown
+    }
+
+@router.post("/examinations/", response_model=schemas.ExaminationResponse)
+def create_examination(exam: schemas.ExaminationCreate, db: Session = Depends(get_db)):
+    db_exam = models.Examination(**exam.dict())
+    db.add(db_exam)
+    db.commit()
+    db.refresh(db_exam)
+    return db_exam
+
+@router.get("/examinations/", response_model=list[schemas.ExaminationResponse])
+def get_examinations(db: Session = Depends(get_db)):
+    return db.query(models.Examination).all()
