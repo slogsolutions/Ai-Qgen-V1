@@ -1,64 +1,130 @@
 # AI_Qgen | Bilingual AI Exams
 
-Welcome to the **AI_Qgen** project! This system provides highly dynamic, bilingual (English/Hindi) question bank generation from context (PDFs) and a dynamic question paper assembly system.
+Welcome to **AI_Qgen**! This system provides highly dynamic, bilingual (English/Hindi) question bank generation from context (PDFs) and a dynamic question paper assembly system.
 
-## Starting the Project
+---
 
-### 1. Requirements 
-Ensure you have Python and PostgreSQL installed locally. 
-- Python 3.10+
-- `pip install -r requirements.txt` (Assuming dependencies like FastAPI, Uvicorn, SQLAlchemy, psycopg2, python-docx, groq, httpx)
+## 🛠 Setup & Installation
 
-### 2. Run the Backend
-Start the FastAPI server via Uvicorn.
-```bash
-cd backend
-uvicorn app:app --reload --port 8000
+Follow these steps to set up the project on your local machine.
+
+### 1. Prerequisites
+
+- **Python**: 3.10 or higher.
+- **PostgreSQL**: Ensure a local instance is running or have a Supabase URL ready.
+- **Ollama (Optional)**: If you wish to run models locally instead of using Groq Cloud.
+
+### 2. Installation
+
+1. **Clone the Repository**:
+   ```bash
+   git clone [your-repo-link]
+   cd AI_Qgen_Main_offline
+   ```
+2. **Create a Virtual Environment**:
+   ```bash
+   python -m venv venv
+   # Windows
+   .\venv\Scripts\activate
+   # Linux/Mac
+   source venv/bin/activate
+   ```
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### 3. Environment Configuration
+
+Create a `.env` file in the root directory and add your credentials:
+
+```env
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/ai_qgen"
+GROQ_API_KEY="your_gsk_key_here"
+
+# --- Optional Local AI ---
+USE_OLLAMA=True
+OLLAMA_MODEL=dolphin3:latest
 ```
-*(Optionally setup your `.env` file containing `DATABASE_URL` and `GROQ_API_KEY` in the project root).*
 
-### 3. Run the Frontend 
-Since this is a vanilla HTML/JS dashboard, you can open `frontend/index.html` directly in your browser or run a simple local web server:
+### 4. Database Initialization
+
+This project uses **Alembic** for schema management. Run this to create the tables:
+
+```bash
+alembic upgrade head
+```
+
+---
+
+## 🚀 Running the Project
+
+### 1. Start the Backend (FastAPI)
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+- The API will be available at `http://localhost:8000`.
+- Documentation (Swagger) is available at `http://localhost:8000/docs`.
+
+### 2. Start the Frontend
+
+Since the dashboard is built with vanilla HTML/JS, you can open `frontend/index.html` directly or serve it via Python:
+
 ```bash
 cd frontend
-python -m http.server 8080
+python -m http.server 3000
 ```
-Then navigate to `http://localhost:8080` in your web browser.
+
+Then navigate to `http://localhost:3000`.
+
+or 
+
+`python -m http.server 3000 --directory frontend`
 
 ---
 
-## How to Switch Databases (Local vs Supabase)
+## ⚠️ Troubleshooting: The 'exam_type' Error
 
-The system is equipped with **Hot-Swapping Database Connections**. This means you do not have to stop your backend completely to switch between offline development and online cloud deployments.
+If you (or a colleague) encounter an error like:
+`psycopg2.errors.UndefinedColumn: column "exam_type" of relation "examinations" does not exist`
 
-**Local PostgreSQL Format**: 
-`postgresql://postgres:YOUR_PASSWORD@localhost:5432/YOUR_DB_NAME`
+This means your local database schema is out of sync with the latest code updates.
 
-**Supabase Format**: 
-`postgresql://postgres.your_project:[YOUR-PASSWORD]@aws-0-REGION.pooler.supabase.com:6543/postgres`
+### Solution 1: The Alembic Way (Recommended)
 
-### Switching via the UI Dashboard
-1. Open the frontend dashboard `index.html`.
-2. On the Top Navigation Bar, click **⚙️ Settings**.
-3. A modal will pop up. Paste your new `postgresql://` connection string into the input box.
-4. Click **"Save Configurations"**.
-5. The backend immediately overwrites your local `.env` and safely hot-swaps the active SQLAlchemy engine in real-time. All subsequent database reads/writes will hit the newly provided database.
+Run the latest migrations to auto-fix the schema:
+
+```bash
+alembic upgrade head
+```
+
+### Solution 2: The Manual Fix Script
+
+If you are unable to run migrations, we provide a standalone fix script:
+
+1. Ensure your `.env` has the correct `DATABASE_URL`.
+2. Run the utility script:
+   ```bash
+   python migrate_db.py
+   ```
+
+This script will safely check for missing columns (like `exam_type`) and add them to your database without deleting any of your existing data.
 
 ---
 
-## How to Use the Generator
+## 🔄 How to Switch Databases (Local vs Supabase)
 
-### Part A: Generate New Question Bank (AI)
-1. Provide **Subject Metadata** to register your current exam.
-2. Under "Generate New Question Bank", specify the subject and upload a **Syllabus PDF**.
-3. **Question Requirements**: Click **+ Add Type** to define exact formats (e.g., 5 MCQ, 10 Fill-in-the-Blanks).
-4. **Difficulty**: Pick from Easy, Medium, Hard. The AI will strictly follow this scale.
-5. Hit generation. The system splits the PDF and enforces numeric constraints effectively, populating the database.
+The system supports **Hot-Swapping Database Connections** via the UI:
 
-### Part B: Create Question Paper (Print Format)
-1. Proceed down to "Create Question Paper".
-2. **Dynamic Sections Builder**: You can add sections like "Section A". For each section, provide:
-   - *Attempt Any (X) / Total*: The amount of questions a student must do (used for calculating points)
-   - *Marks per Q*: Individual point value.
-3. Click **+ Add Specific Type Request** to formulate question pools inside the section. (e.g. telling it to pull 5 MCQs and 3 True/False questions directly into Section A).
-4. Compile the paper! The Engine securely groups them up, calculates the section's total points dynamically, and triggers a `.docx` download alongside a translated `.docx` Answer Key automatically.
+1. Click **⚙️ Settings** in the Navbar.
+2. Paste your new `postgresql://` connection string.
+3. Click **Save**. The backend will overwrite your `.env` and immediately switch the active connection without a restart.
+
+---
+
+## 📄 How to Use
+
+- **Part A (Generator)**: Register a subject, upload a PDF syllabus, and use the **+ Add Type** button to define how many questions you want the AI to generate.
+- **Part B (Assembler)**: Use the "Create Question Paper" section to build sections, define "Attempt Any" rules, and fetch questions from the pool to compile a professional `.docx` paper.
