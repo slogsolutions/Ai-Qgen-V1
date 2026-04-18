@@ -78,9 +78,9 @@ async def generate_from_pdf(
 
     # Check if we can reuse existing pool
     should_reindex = True
+    
     if file:
         if subject.last_syllabus_filename == file.filename:
-            # Check if vector DB actually has data
             if not vector_db.is_collection_empty(subject_id):
                 should_reindex = False
                 print(f"[{datetime.datetime.now()}] Skipping extraction/indexing: Found existing pool for '{file.filename}'")
@@ -146,13 +146,21 @@ async def generate_from_pdf(
         actual_q_type = q_data.get("q_type", "Mixed")
         
         if type_limits:
-            current_count = type_counts.get(actual_q_type, 0)
-            limit = type_limits.get(actual_q_type, 0)
-            
-            if limit <= 0 or current_count >= limit:
-                continue 
+            # If "Mixed" quota exists, allow any valid type to consume it
+            if "Mixed" in type_limits and type_limits["Mixed"] > 0:
+                current_mixed = type_counts.get("Mixed", 0)
+                if current_mixed < type_limits["Mixed"]:
+                    type_counts["Mixed"] = current_mixed + 1
+                else:
+                    continue
+            else:
+                current_count = type_counts.get(actual_q_type, 0)
+                limit = type_limits.get(actual_q_type, 0)
                 
-            type_counts[actual_q_type] = current_count + 1
+                if limit <= 0 or current_count >= limit:
+                    continue 
+                    
+                type_counts[actual_q_type] = current_count + 1
 
         options_json = json.dumps(q_data.get("options")) if q_data.get("options") else None
 

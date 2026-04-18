@@ -80,7 +80,7 @@ def get_rag_query_for_type(q_type: str) -> str:
         return "real-world scenarios, applications, examples, case studies, and problems"
     return "key concepts and important information"
 
-def generate_questions_rag(subject_id: int, types_config: list, difficulty: str = "Medium", provider: str = None, model: str = None) -> list:
+def generate_questions_rag(subject_id: int, types_config: list, difficulty: str = "Medium", provider: str = "groq", model: str = "llama-3.1-8b-instant") -> list:
     """
     Generates structured bilingual questions using optimized RAG context.
     Combines chunks into a single request per question type to save tokens.
@@ -109,9 +109,26 @@ def generate_questions_rag(subject_id: int, types_config: list, difficulty: str 
                 break
                 
             target_q = remaining_target
-            mixed_instruction = "Provide a diverse mix of 'MCQ', 'FIB' (Fill in Blanks), 'T/F', and 'SA' (Short Answer) questions." if qt == "Mixed" else ""
-            q_type_format = '"{actual_type_here}"' if qt == "Mixed" else f'"{qt}"'
-            
+            if qt == "Mixed":
+                counts = {"MCQ": 0, "FIB": 0, "T/F": 0, "SA": 0}
+                types = list(counts.keys())
+                for i in range(target_q):
+                    counts[types[i % 4]] += 1
+                mixed_instruction = f"You MUST generate EXACTLY {target_q} questions with this EXACT distribution: {counts['MCQ']} MCQs, {counts['FIB']} Fill in the Blanks, {counts['T/F']} True/False, and {counts['SA']} Short Answers."
+                format_example = """{
+  "questions": [
+    { "q_type": "MCQ", "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": {"A": "Apple / सेब", "B": "Mango / आम", "C": "Banana / केला", "D": "Grape / अंगूर"}, "correct_option": "A" },
+    { "q_type": "FIB", "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": null, "correct_option": null }
+  ]
+}"""
+            else:
+                mixed_instruction = ""
+                format_example = f"""{{
+  "questions": [
+    {{ "q_type": "{qt}", "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": {{"A": "Apple / सेब", "B": "Mango / आम", "C": "Banana / केला", "D": "Grape / अंगूर"}}, "correct_option": "A" }}
+  ]
+}}"""
+
             prompt = f"""
 ACT as a bilingual exam expert. Generate {target_q} questions in English & Hindi from the context.
 DIFFICULTY: {difficulty}
@@ -120,11 +137,13 @@ CONTEXT:
 {combined_context}
 
 RULES:
-1. Output ONLY a valid JSON object.
+1. Output ONLY a valid JSON object matching the exact schema below.
 2. {mixed_instruction}
-3. Format: {{"questions": [{{ "q_type": {q_type_format}, "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": ["Option 1 (English) / Option 1 (Hindi)", "Option 2 (English) / Option 2 (Hindi)", "Option 3 (English) / Option 3 (Hindi)", "Option 4 (English) / Option 4 (Hindi)"], "correct_option": "Option 1 (English) / Option 1 (Hindi)" }}]}}
-4. For MCQs, the "options" list MUST contain exactly 4 options. Every option MUST be bilingual in the format: "English Text / Hindi Text".
-5. Ensure Hindi (Devanagari) matches English perfectly.
+3. FORMAT EXAMPLE:
+{format_example}
+4. CRITICAL MCQ RULE: For MCQs, "options" MUST be a dictionary with keys A, B, C, D. Every option value MUST be bilingual using a slash (e.g. "English / Hindi"). English-only options are FORBIDDEN.
+5. If the question is NOT an MCQ, set "options" to null.
+6. TRANSLATION QUALITY: The Hindi translation MUST be natural, grammatically correct, and use appropriate academic vocabulary. Translate the entire sentence contextually—do NOT do a literal, word-by-word translation.
 """
             try:
                 print(f"[{datetime.datetime.now()}]   -> Generating {target_q} {qt} questions using RAG (Attempt {attempt+1}/{MAX_RETRIES})...")
@@ -157,6 +176,17 @@ RULES:
                 
                 for q in valid_qs:
                     actual_qt = q.get("q_type", qt)
+                    
+                    # Auto-fix list options to dict
+                    if isinstance(q.get("options"), list):
+                        opts = q["options"]
+                        keys = ["A", "B", "C", "D"]
+                        # If the list item already contains '/', don't append missing hindi tag
+                        q["options"] = {
+                            keys[i]: opts[i] if "/" in str(opts[i]) else f"{opts[i]} / [Hindi Missing]" 
+                            for i in range(min(len(opts), 4))
+                        }
+                        
                     if (actual_qt == qt or qt == "Mixed") and remaining_target > 0:
                         all_qs.append(q)
                         remaining_target -= 1
