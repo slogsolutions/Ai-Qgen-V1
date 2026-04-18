@@ -48,3 +48,9 @@ output.json
 .DS_Store
 Thumbs.db
 z_books/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+chroma_data/

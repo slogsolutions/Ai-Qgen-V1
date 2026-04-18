@@ -109,8 +109,11 @@ def generate_questions_rag(subject_id: int, types_config: list, difficulty: str 
                 break
                 
             target_q = remaining_target
+            mixed_instruction = "Provide a diverse mix of 'MCQ', 'FIB' (Fill in Blanks), 'T/F', and 'SA' (Short Answer) questions." if qt == "Mixed" else ""
+            q_type_format = '"{actual_type_here}"' if qt == "Mixed" else f'"{qt}"'
+            
             prompt = f"""
-ACT as a bilingual exam expert. Generate {target_q} {qt} questions in English & Hindi from the context.
+ACT as a bilingual exam expert. Generate {target_q} questions in English & Hindi from the context.
 DIFFICULTY: {difficulty}
 
 CONTEXT:
@@ -118,8 +121,10 @@ CONTEXT:
 
 RULES:
 1. Output ONLY a valid JSON object.
-2. Format: {{"questions": [{{ "q_type": "{qt}", "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": ["Option 1", "Option 2", "Option 3", "Option 4"] (for MCQ), "correct_option": "Option 1" (for MCQ) }}]}}
-3. Ensure Hindi (Devanagari) matches English perfectly.
+2. {mixed_instruction}
+3. Format: {{"questions": [{{ "q_type": {q_type_format}, "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": ["Option 1 (English) / Option 1 (Hindi)", "Option 2 (English) / Option 2 (Hindi)", "Option 3 (English) / Option 3 (Hindi)", "Option 4 (English) / Option 4 (Hindi)"], "correct_option": "Option 1 (English) / Option 1 (Hindi)" }}]}}
+4. For MCQs, the "options" list MUST contain exactly 4 options. Every option MUST be bilingual in the format: "English Text / Hindi Text".
+5. Ensure Hindi (Devanagari) matches English perfectly.
 """
             try:
                 print(f"[{datetime.datetime.now()}]   -> Generating {target_q} {qt} questions using RAG (Attempt {attempt+1}/{MAX_RETRIES})...")
@@ -152,7 +157,7 @@ RULES:
                 
                 for q in valid_qs:
                     actual_qt = q.get("q_type", qt)
-                    if actual_qt == qt and remaining_target > 0:
+                    if (actual_qt == qt or qt == "Mixed") and remaining_target > 0:
                         all_qs.append(q)
                         remaining_target -= 1
                 
