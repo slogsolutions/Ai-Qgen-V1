@@ -62,3 +62,12 @@ def retrieve_context(subject_id: int, query: str, n_results: int = 5) -> list[st
         return results["documents"][0]
         
     return []
+
+def is_collection_empty(subject_id: int) -> bool:
+    """Checks if a collection exists and contains any documents."""
+    collection_name = f"subject_{subject_id}"
+    try:
+        collection = client.get_collection(name=collection_name)
+        return collection.count() == 0
+    except:
+        return True

@@ -55,12 +55,14 @@ def get_llm_models(provider: str = "groq"):
     """Returns available models for the given provider."""
     if provider == "ollama":
         return model_fetcher.get_ollama_models()
+    elif provider == "gemini":
+        return model_fetcher.get_gemini_models()
     return model_fetcher.get_groq_models()
 
 @router.post("/generate/from-pdf/")
 async def generate_from_pdf(
     subject_id: int, 
-    file: UploadFile = File(...), 
+    file: Optional[UploadFile] = File(None), 
     q_types_config: str = Form("[]"),
     difficulty: str = Form("Medium"),
     provider: Optional[str] = Form(None),
@@ -74,15 +76,34 @@ async def generate_from_pdf(
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
 
-    # 1. Extract and chunk PDF
-    print(f"[{datetime.datetime.now()}] 1/3: Extracting and chunking PDF... (this may take a few seconds)")
-    chunks = await pdf_extractor.extract_and_chunk_pdf(file)
-    print(f"[{datetime.datetime.now()}] Extracted {len(chunks)} text chunks.")
-    
-    # 2. Store in Vector DB
-    print(f"[{datetime.datetime.now()}] 2/3: Storing chunks in Vector Database...")
-    await asyncio.to_thread(vector_db.store_chunks, subject_id, chunks)
-    print(f"[{datetime.datetime.now()}] Vector indexing complete.")
+    # Check if we can reuse existing pool
+    should_reindex = True
+    if file:
+        if subject.last_syllabus_filename == file.filename:
+            # Check if vector DB actually has data
+            if not vector_db.is_collection_empty(subject_id):
+                should_reindex = False
+                print(f"[{datetime.datetime.now()}] Skipping extraction/indexing: Found existing pool for '{file.filename}'")
+        
+        if should_reindex:
+            # 1. Extract and chunk PDF
+            print(f"[{datetime.datetime.now()}] 1/3: Extracting and chunking PDF... (this may take a few seconds)")
+            chunks = await pdf_extractor.extract_and_chunk_pdf(file)
+            print(f"[{datetime.datetime.now()}] Extracted {len(chunks)} text chunks.")
+            
+            # 2. Store in Vector DB
+            print(f"[{datetime.datetime.now()}] 2/3: Storing chunks in Vector Database...")
+            await asyncio.to_thread(vector_db.store_chunks, subject_id, chunks)
+            print(f"[{datetime.datetime.now()}] Vector indexing complete.")
+            
+            # Update last filename in DB
+            subject.last_syllabus_filename = file.filename
+            db.commit()
+    else:
+        # No file provided, check if pool exists
+        if vector_db.is_collection_empty(subject_id):
+            raise HTTPException(status_code=400, detail="No syllabus provided and no existing pool found for this subject.")
+        print(f"[{datetime.datetime.now()}] Using existing vector pool for subject {subject_id}")
     
     try:
         types_config = json.loads(q_types_config)

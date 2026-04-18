@@ -12,6 +12,7 @@ class Subject(Base):
     branch_code = Column(String)
     sem_year = Column(String)
     year = Column(String)
+    last_syllabus_filename = Column(String, nullable=True)
     
     questions = relationship("Question", back_populates="subject", cascade="all, delete-orphan")
     papers = relationship("Paper", back_populates="subject", cascade="all, delete-orphan")

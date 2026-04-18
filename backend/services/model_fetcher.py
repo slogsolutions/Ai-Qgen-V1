@@ -62,7 +62,9 @@ def get_groq_models():
             {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B Versatile"},
             {"id": "llama-guard-3-8b", "name": "Llama Guard 3 8B"},
             {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B"},
-            {"id": "gemma2-9b-it", "name": "Gemma 2 9B"}
+            {"id": "gemma2-9b-it", "name": "Gemma 2 9B"},
+            {"id": "gemma-2-27b", "name": "Gemma 2 27B"},
+            {"id": "gemma-4-26b", "name": "Gemma 4 26B (Experimental)"}
         ]
         
         # Try to fetch dynamically
@@ -80,3 +82,13 @@ def get_groq_models():
     except Exception as e:
         print(f"Error fetching Groq models: {e}")
         return []
+
+def get_gemini_models():
+    """Returns available Gemini models."""
+    return [
+        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash"},
+        {"id": "gemma-3-12b", "name": "Gemma 3 12B"},
+        {"id": "gemma-3-27b", "name": "Gemma 3 27B"},
+        {"id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite"},
+        {"id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash Lite"}
+    ]
