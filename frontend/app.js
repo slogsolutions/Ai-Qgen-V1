@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <option value="LA">Long Answer</option>
                 <option value="CASE">Case-Based</option>
             </select>
-            <input type="number" class="gt-num" value="10" min="1" max="100" style="flex: 1;" required>
+            <input type="number" class="gt-num" value="10" min="1" max="300" style="flex: 1;" required>
             <button type="button" class="btn outline-btn" style="padding: 0 10px; border-color: #ef4444; color: #ef4444;" onclick="this.parentElement.remove()">X</button>
         `;
         genTypesContainer.appendChild(div);
@@ -179,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <div style="flex: 1;">
                     <label>Attempt Any (X) / Total</label>
-                    <input type="number" class="sec-attempt" value="10" min="1" max="100" required>
+                    <input type="number" class="sec-attempt" value="10" min="1" max="300" required>
                 </div>
                 <div style="flex: 1;">
                     <label>Marks per Q</label>
@@ -218,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <option value="LA">Long Answer</option>
                 <option value="CASE">Case-Based</option>
             </select>
-            <input type="number" class="pool-num" value="5" min="1" max="100" style="flex: 1;" required>
+            <input type="number" class="pool-num" value="5" min="1" max="300" style="flex: 1;" required>
             <button type="button" class="btn outline-btn" style="padding: 0 10px; border-color: #ef4444; color: #ef4444;" onclick="this.parentElement.remove()">X</button>
         `;
         container.appendChild(poolDiv);
@@ -350,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const navDashboard = document.getElementById("navDashboard");
     const navAnalytics = document.getElementById("navAnalytics");
     const navHistory = document.getElementById("navHistory");
-    
+
     const dashboardView = document.getElementById("dashboardView");
     const analyticsView = document.getElementById("analyticsView");
     const historyView = document.getElementById("historyView");
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("analyticsEmpty").classList.remove("hidden");
         }
     });
-    
+
     const paperSubjectId = document.getElementById("paperSubjectId");
     paperSubjectId.addEventListener("change", async () => {
         const subId = paperSubjectId.value;
@@ -404,7 +404,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Quick find from the select option text (or we could have stored it in a map)
         const selectedOption = paperSubjectId.options[paperSubjectId.selectedIndex].text;
         const subCode = selectedOption.split(" - ")[0];
-        
+
         try {
             const res = await fetch(`${API_BASE}/analytics/subject/${subCode}`);
             if (!res.ok) throw new Error();
@@ -420,7 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const container = document.getElementById("paperTypeStats");
         const health = document.getElementById("paperSubjectHealth");
         container.innerHTML = "";
-        
+
         let totalLimit = 0;
         let totalHeld = 0;
 
@@ -436,11 +436,11 @@ document.addEventListener("DOMContentLoaded", () => {
         Object.entries(data.breakdown).forEach(([type, stats]) => {
             totalLimit += stats.total;
             totalHeld += stats.used;
-            
+
             if (stats.total > 0) {
                 const perc = (stats.used / stats.total) * 100;
                 const remaining = stats.total - stats.used;
-                
+
                 // Determine Status
                 let statusText = "High Supply";
                 let statusClass = "status-high";
@@ -473,7 +473,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const overall = totalLimit > 0 ? (totalHeld / totalLimit) * 100 : 0;
-        
+
         document.getElementById("paperTotalPool").textContent = totalLimit;
         document.getElementById("paperTotalUsed").textContent = totalHeld;
         document.getElementById("paperOverallConsumption").textContent = overall.toFixed(1) + "%";
@@ -495,16 +495,16 @@ async function loadAnalytics(subjectCode) {
     const content = document.getElementById("analyticsContent");
     const empty = document.getElementById("analyticsEmpty");
     const typeBreakdown = document.getElementById("typeBreakdown");
-    
+
     try {
         const res = await fetch(`${API_BASE}/analytics/subject/${subjectCode}`);
         if (!res.ok) throw new Error("Failed to load analytics");
         const data = await res.json();
-        
+
         // Summary stats
         let grandTotal = 0;
         let grandUsed = 0;
-        
+
         const typeLabels = {
             "MCQ": "Multiple Choice (MCQs)",
             "FIB": "Fill in the Blanks",
@@ -513,15 +513,15 @@ async function loadAnalytics(subjectCode) {
             "LA": "Long Answer",
             "CASE": "Case-Based Questions"
         };
-        
+
         typeBreakdown.innerHTML = "";
         Object.entries(data.breakdown).forEach(([type, stats]) => {
             grandTotal += stats.total;
             grandUsed += stats.used;
-            
+
             const remaining = stats.total - stats.used;
             const perc = stats.total > 0 ? ((stats.used / stats.total) * 100).toFixed(0) : 0;
-            
+
             // Determine Status
             let statusText = "High Supply";
             let statusClass = "status-high";
@@ -532,7 +532,7 @@ async function loadAnalytics(subjectCode) {
                 statusText = "Moderate";
                 statusClass = "status-moderate";
             }
-            
+
             const card = document.createElement("div");
             card.className = "analytics-item-card";
             card.innerHTML = `
@@ -550,12 +550,12 @@ async function loadAnalytics(subjectCode) {
             `;
             typeBreakdown.appendChild(card);
         });
-        
+
         document.getElementById("totalQuestionsCount").textContent = grandTotal;
         document.getElementById("totalUsedCount").textContent = grandUsed;
         const overallRate = grandTotal > 0 ? ((grandUsed / grandTotal) * 100).toFixed(1) : 0;
         document.getElementById("overallConsumption").textContent = overallRate + "%";
-        
+
         content.classList.remove("hidden");
         empty.classList.add("hidden");
     } catch (err) {
@@ -584,7 +584,7 @@ async function loadSubjects() {
             const opt = `<option value="${sub.id}">${sub.subject_code} - ${sub.name}</option>`;
             sel1.innerHTML += opt;
             sel2.innerHTML += opt;
-            
+
             const optAn = `<option value="${sub.subject_code}">${sub.subject_code} - ${sub.name}</option>`;
             sel3.innerHTML += optAn;
         });
