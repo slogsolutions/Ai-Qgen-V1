@@ -87,34 +87,46 @@ def generate_questions_rag(subject_id: int, types_config: list, difficulty: str 
     """
     all_qs = []
     import datetime
+    import time
+    
+    MAX_BATCH_SIZE = 5
+    SLEEP_TIME_SECONDS = 65
 
+    # 1. Build a flat queue of manageable tasks to bypass rate limits
+    tasks = []
     for tc in types_config:
         qt = tc.get("q_type", "Mixed")
         nq = int(tc.get("num_q", 0))
-        if nq <= 0:
-            continue
-            
+        
+        while nq > 0:
+            batch_q = min(nq, MAX_BATCH_SIZE)
+            tasks.append({"q_type": qt, "num_q": batch_q})
+            nq -= batch_q
+
+    # 2. Process tasks sequentially
+    for task_index, task in enumerate(tasks):
+        qt = task["q_type"]
+        target_q = task["num_q"]
+        remaining_target = target_q
+        MAX_RETRIES = 2
+        
         synthetic_query = get_rag_query_for_type(qt)
-        # Get enough context (capped at 3 chunks to keep tokens low)
-        n_chunks = 3 if nq <= 5 else 5
+        # Keep chunks low (3) to prevent hitting Groq's strict 6000 Tokens-Per-Minute limit
+        n_chunks = 3 if target_q <= 5 else 5
         chunks = vector_db.retrieve_context(subject_id, synthetic_query, n_results=n_chunks)
         
         combined_context = "\n---\n".join(chunks) if chunks else "No specific context found."
-            
-        remaining_target = nq
-        MAX_RETRIES = 2
         
         for attempt in range(MAX_RETRIES):
             if remaining_target <= 0:
                 break
                 
-            target_q = remaining_target
             if qt == "Mixed":
                 counts = {"MCQ": 0, "FIB": 0, "T/F": 0, "SA": 0}
                 types = list(counts.keys())
-                for i in range(target_q):
+                for i in range(remaining_target):
                     counts[types[i % 4]] += 1
-                mixed_instruction = f"You MUST generate EXACTLY {target_q} questions with this EXACT distribution: {counts['MCQ']} MCQs, {counts['FIB']} Fill in the Blanks, {counts['T/F']} True/False, and {counts['SA']} Short Answers."
+                mixed_instruction = f"You MUST generate EXACTLY {remaining_target} questions with this EXACT distribution: {counts['MCQ']} MCQs, {counts['FIB']} Fill in the Blanks, {counts['T/F']} True/False, and {counts['SA']} Short Answers."
                 format_example = """{
   "questions": [
     { "q_type": "MCQ", "question_en": "...", "question_hi": "...", "answer_en": "...", "answer_hi": "...", "options": {"A": "Apple / सेब", "B": "Mango / आम", "C": "Banana / केला", "D": "Grape / अंगूर"}, "correct_option": "A" },
@@ -130,7 +142,7 @@ def generate_questions_rag(subject_id: int, types_config: list, difficulty: str 
 }}"""
 
             prompt = f"""
-ACT as a bilingual exam expert. Generate {target_q} questions in English & Hindi from the context.
+ACT as a bilingual exam expert. Generate {remaining_target} questions in English & Hindi from the context.
 DIFFICULTY: {difficulty}
 
 CONTEXT:
@@ -142,11 +154,12 @@ RULES:
 3. FORMAT EXAMPLE:
 {format_example}
 4. CRITICAL MCQ RULE: For MCQs, "options" MUST be a dictionary with keys A, B, C, D. Every option value MUST be bilingual using a slash (e.g. "English / Hindi"). English-only options are FORBIDDEN.
-5. If the question is NOT an MCQ, set "options" to null.
-6. TRANSLATION QUALITY: The Hindi translation MUST be natural, grammatically correct, and use appropriate academic vocabulary. Translate the entire sentence contextually—do NOT do a literal, word-by-word translation.
+5. DIVERSITY RULE: The provided context contains distinct excerpts separated by '---'. You MUST generate questions that draw evenly from ALL the different excerpts. Do not focus all questions on just one topic or excerpt.
+6. If the question is NOT an MCQ, set "options" to null.
+7. TRANSLATION QUALITY: The Hindi translation MUST be natural, grammatically correct, and use appropriate academic vocabulary. Translate the entire sentence contextually—do NOT do a literal, word-by-word translation.
 """
             try:
-                print(f"[{datetime.datetime.now()}]   -> Generating {target_q} {qt} questions using RAG (Attempt {attempt+1}/{MAX_RETRIES})...")
+                print(f"[{datetime.datetime.now()}]   -> Generating {remaining_target} {qt} questions using RAG (Task {task_index+1}/{len(tasks)}, Attempt {attempt+1}/{MAX_RETRIES})...")
                 content = _call_llm(prompt, provider=provider, model=model)
                 
                 content = content.strip()
@@ -159,7 +172,6 @@ RULES:
                 try:
                     data = json.loads(content)
                 except:
-                    # Basic salvage for missing trailing braces
                     if not content.endswith("}"):
                         content += "}"
                     if not content.endswith("]}"):
@@ -177,11 +189,9 @@ RULES:
                 for q in valid_qs:
                     actual_qt = q.get("q_type", qt)
                     
-                    # Auto-fix list options to dict
                     if isinstance(q.get("options"), list):
                         opts = q["options"]
                         keys = ["A", "B", "C", "D"]
-                        # If the list item already contains '/', don't append missing hindi tag
                         q["options"] = {
                             keys[i]: opts[i] if "/" in str(opts[i]) else f"{opts[i]} / [Hindi Missing]" 
                             for i in range(min(len(opts), 4))
@@ -191,11 +201,20 @@ RULES:
                         all_qs.append(q)
                         remaining_target -= 1
                 
-                print(f"[{datetime.datetime.now()}]   -> Successfully parsed {len(valid_qs)} questions. Remaining target for {qt}: {remaining_target}")
+                print(f"[{datetime.datetime.now()}]   -> Successfully parsed {len(valid_qs)} questions. Remaining target for this task: {remaining_target}")
                 
             except Exception as e:
                 print(f"[{datetime.datetime.now()}]   -> Error processing chunk with LLM: {str(e)}")
                 continue
+
+        # 3. Rate Limit Sleep Logic
+        if task_index < len(tasks) - 1:
+            if provider.lower() == "groq":
+                print(f"[{datetime.datetime.now()}] Sleeping for {SLEEP_TIME_SECONDS} seconds to clear Groq API rate limits...")
+                time.sleep(SLEEP_TIME_SECONDS)
+            else:
+                print(f"[{datetime.datetime.now()}] Sleeping for 5 seconds between batches...")
+                time.sleep(5)
 
     if not all_qs:
         raise ValueError("Token Limit Reached or Complete failure. No LLM questions generated successfully.")
