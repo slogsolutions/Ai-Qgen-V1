@@ -122,6 +122,31 @@
             <div id="genStatus" class="status-msg"></div>
         </section>
 
+        <!-- CSV Importer Section -->
+        <section class="glass-panel main-form" style="margin-top: 20px;">
+            <h2>Import External Questions (CSV)</h2>
+            <form id="importCsvForm">
+                <div class="input-group">
+                    <label>Select Subject to Import Into</label>
+                    <select id="importSubjectId" required>
+                        <option value="">Loading subjects...</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Upload Question Bank (.csv)</label>
+                    <input type="file" id="csvFile" accept=".csv" required>
+                    <small style="display: block; margin-top: 5px; color: rgba(255,255,255,0.6);">
+                        Must contain headers: Question_Type, Question_EN, Answer_EN. <a href="#" id="downloadTemplate" style="color: #4CAF50;">Download Template</a>
+                    </small>
+                </div>
+                <button type="submit" class="btn outline-btn" style="margin-top: 10px;">
+                    <span class="btn-text">Import CSV</span>
+                    <span class="loader hidden"></span>
+                </button>
+            </form>
+            <div id="importCsvStatus" class="status-msg"></div>
+        </section>
+
         <section class="glass-panel paper-form">
             <h2>Create Question Paper</h2>
             <form id="paperForm">

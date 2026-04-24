@@ -6,6 +6,9 @@ import google.generativeai as genai
 from . import vector_db
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY", "default-test-key"))
+key2 = os.getenv("GROQ_API_KEY2")
+client2 = Groq(api_key=key2) if key2 else None
+
 USE_OLLAMA = os.getenv("USE_OLLAMA", "True").lower() in ["true", "1", "yes"]
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
@@ -28,8 +31,8 @@ def _call_llm(prompt: str, provider: str = None, model: str = None) -> str:
                 "stream": False,
                 "format": "json",
                 "options": {
-                    "num_ctx": 2048,
-                    "num_predict": 1024
+                    "num_ctx": 4096,
+                    "num_predict": 3000
                 }
             },
             timeout=900.0
@@ -47,24 +50,41 @@ def _call_llm(prompt: str, provider: str = None, model: str = None) -> str:
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     candidate_count=1,
-                    max_output_tokens=1024,
+                    max_output_tokens=3000,
                     temperature=0.7,
                 )
             )
             return response.text
         except Exception as e:
+            import datetime
             print(f"[{datetime.datetime.now()}] [DEBUG] Gemini API Error with model '{gemini_model_name}': {e}")
             raise e
     else:
         if client.api_key == "default-test-key":
             raise ValueError("GROQ_API_KEY is not configured in .env")
-        response = client.chat.completions.create(
-            model=active_model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=1024,
-        )
-        return response.choices[0].message.content
+            
+        try:
+            response = client.chat.completions.create(
+                model=active_model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=3000,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # Simple Fallback: If 429 Rate Limit is hit, instantly swap to Key 2
+            if "429" in str(e) and client2:
+                import datetime
+                print(f"[{datetime.datetime.now()}] Groq 429 Rate Limit hit on Key 1! Instantly swapping to GROQ_API_KEY2...")
+                response_backup = client2.chat.completions.create(
+                    model=active_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=3000,
+                )
+                return response_backup.choices[0].message.content
+            else:
+                raise e
 
 def get_rag_query_for_type(q_type: str) -> str:
     """Returns a synthetic search query to find the best chunks for a specific question type."""
@@ -89,8 +109,17 @@ def generate_questions_rag(subject_id: int, types_config: list, difficulty: str 
     import datetime
     import time
     
-    MAX_BATCH_SIZE = 5
+    # Dynamic Batch Sizing based on Model Complexity
+    if "8b" in model.lower():
+        MAX_BATCH_SIZE = 5
+    elif "70b" in model.lower():
+        MAX_BATCH_SIZE = 10
+    else:
+        MAX_BATCH_SIZE = 10 # Default for other models
+        
     SLEEP_TIME_SECONDS = 65
+
+    print(f"[{datetime.datetime.now()}] Initializing generation with batch size: {MAX_BATCH_SIZE} (Model: {model})")
 
     # 1. Build a flat queue of manageable tasks to bypass rate limits
     tasks = []

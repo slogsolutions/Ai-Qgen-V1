@@ -150,6 +150,68 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // CSV Import Form Handler
+    const importCsvForm = document.getElementById("importCsvForm");
+    importCsvForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const subjectId = document.getElementById("importSubjectId").value;
+        const csvFile = document.getElementById("csvFile").files[0];
+        const status = document.getElementById("importCsvStatus");
+        const btn = importCsvForm.querySelector("button");
+        const btnText = btn.querySelector(".btn-text");
+        const loader = btn.querySelector(".loader");
+
+        if (!subjectId || !csvFile) {
+            alert("Please select a subject and upload a CSV file.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", csvFile);
+
+        btnText.textContent = "Importing CSV...";
+        loader.classList.remove("hidden");
+        status.textContent = "";
+
+        try {
+            const res = await fetch(`${API_BASE}/import-csv/subject/${subjectId}`, {
+                method: "POST",
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                status.style.color = "#4ade80";
+                status.textContent = "Success: " + data.message;
+                importCsvForm.reset();
+            } else {
+                throw new Error(data.detail || "Server Error");
+            }
+        } catch (err) {
+            status.style.color = "#f87171";
+            status.textContent = "Error: " + err.message;
+        } finally {
+            btnText.textContent = "Import CSV";
+            loader.classList.add("hidden");
+        }
+    });
+
+    // Download Template Handler
+    const downloadTemplate = document.getElementById("downloadTemplate");
+    downloadTemplate.addEventListener("click", (e) => {
+        e.preventDefault();
+        const headers = "Question_Type,Difficulty,Question_EN,Question_HI,Option_A,Option_B,Option_C,Option_D,Answer_EN,Answer_HI\n";
+        const sample = "MCQ,Medium,What is the capital of France?,फ्रांस की राजधानी क्या है?,Paris / पेरिस,London / लंदन,Berlin / बर्लिन,Madrid / मैड्रिड,Paris,पेरिस\n";
+        const blob = new Blob([headers + sample], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "question_import_template.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
     const paperForm = document.getElementById("paperForm");
     const dynamicSections = document.getElementById("dynamicSections");
     const addSectionBtn = document.getElementById("addSectionBtn");
@@ -575,15 +637,18 @@ async function loadSubjects() {
         const sel1 = document.getElementById("subjectId");
         const sel2 = document.getElementById("paperSubjectId");
         const sel3 = document.getElementById("analyticsSubjectFilter");
+        const sel4 = document.getElementById("importSubjectId");
 
         sel1.innerHTML = '<option value="">Select a subject</option>';
         sel2.innerHTML = '<option value="">Select a subject</option>';
         sel3.innerHTML = '<option value="">Select a subject</option>';
+        if (sel4) sel4.innerHTML = '<option value="">Select a subject</option>';
 
         subjects.forEach(sub => {
             const opt = `<option value="${sub.id}">${sub.subject_code} - ${sub.name}</option>`;
             sel1.innerHTML += opt;
             sel2.innerHTML += opt;
+            if (sel4) sel4.innerHTML += opt;
 
             const optAn = `<option value="${sub.subject_code}">${sub.subject_code} - ${sub.name}</option>`;
             sel3.innerHTML += optAn;

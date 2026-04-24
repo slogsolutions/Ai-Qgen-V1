@@ -9,7 +9,8 @@ import os
 import re
 import datetime
 import random
-
+import csv
+import io
 router = APIRouter()
 
 @router.post("/subjects/", response_model=schemas.SubjectResponse)
@@ -111,11 +112,22 @@ async def generate_from_pdf(
         types_config = []
 
     type_limits = {}
+    total_requested = 0
     for tc in types_config:
         qt = tc.get("q_type", "Mixed")
         nq = int(tc.get("num_q", 0))
+        
+        # Enforce backend limit of 300 questions per type
+        if nq > 300:
+            nq = 300
+            
         if nq > 0:
             type_limits[qt] = type_limits.get(qt, 0) + nq
+            total_requested += nq
+            
+    # Enforce global backend limit of 300 questions total per request
+    if total_requested > 300:
+        raise HTTPException(status_code=400, detail="Backend Limit Exceeded: You cannot generate more than 300 questions at a time.")
 
     try:
         # If ollama selected, ensure it's serving
@@ -188,6 +200,72 @@ async def generate_from_pdf(
         
     db.commit()
     return {"message": f"Generated {len(saved_qs)} questions successfully."}
+
+@router.post("/import-csv/subject/{subject_id}")
+async def import_csv_questions(subject_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Imports questions directly from a structured CSV file."""
+    subject = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported.")
+
+    content = await file.read()
+    try:
+        decoded_content = content.decode('utf-8-sig') # utf-8-sig removes BOM if present
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="CSV file must be UTF-8 encoded.")
+
+    csv_reader = csv.DictReader(io.StringIO(decoded_content))
+    
+    questions_to_save = []
+    row_count = 0
+    
+    for row in csv_reader:
+        row_count += 1
+        q_type = row.get("Question_Type", "").strip()
+        if not q_type:
+            continue # Skip empty rows
+            
+        diff = row.get("Difficulty", "").strip() or "Medium"
+        q_en = row.get("Question_EN", "").strip()
+        q_hi = row.get("Question_HI", "").strip() or "[Hindi Missing]"
+        ans_en = row.get("Answer_EN", "").strip()
+        ans_hi = row.get("Answer_HI", "").strip() or "[Hindi Missing]"
+        
+        if not q_en or not ans_en:
+            continue # Skip invalid rows
+            
+        options_json = None
+        if q_type == "MCQ":
+            opts = {}
+            for key, col in [("A", "Option_A"), ("B", "Option_B"), ("C", "Option_C"), ("D", "Option_D")]:
+                val = row.get(col, "").strip()
+                if val:
+                    opts[key] = val if "/" in val else f"{val} / [Hindi Missing]"
+            if opts:
+                options_json = json.dumps(opts)
+                
+        new_q = models.Question(
+            subject_id=subject_id,
+            q_type=q_type,
+            difficulty=diff,
+            question_en=q_en,
+            question_hi=q_hi,
+            answer_en=ans_en,
+            answer_hi=ans_hi,
+            options=options_json
+        )
+        questions_to_save.append(new_q)
+        
+    if not questions_to_save:
+        raise HTTPException(status_code=400, detail="No valid questions found in the CSV. Please check the template formatting.")
+        
+    db.add_all(questions_to_save)
+    db.commit()
+    
+    return {"message": f"Successfully imported {len(questions_to_save)} questions.", "imported_count": len(questions_to_save)}
 
 @router.post("/papers/generate/")
 def generate_paper(request: schemas.PaperGenerationRequest, db: Session = Depends(get_db)):

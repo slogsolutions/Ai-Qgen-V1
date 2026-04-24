@@ -68,5 +68,4 @@ OLLAMA_MODEL=qwen2.5:3b
 *   **Backend**: `uvicorn backend.main:app --reload`
 *   **Frontend**: `python -m http.server 3000 --directory frontend`
 
----
-*Optimized for 8GB RAM | Powered by RAG & ChromaDB*
+
