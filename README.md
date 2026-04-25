@@ -1,71 +1,86 @@
-# 🚀 AI-Qgen | Technical Overview
+# 📝 AI-Qgen | Question Bank Manager & Exam Generator
 
-**AI-Qgen** is a bilingual question generation engine that transforms static PDFs into dynamic, structured exam banks. It uses a **RAG (Retrieval-Augmented Generation)** architecture to handle massive documents on low-end hardware.
-
----
-
-## 🛠️ Tech Stack
-*   **Backend**: FastAPI (Python 3.10+)
-*   **Database**: PostgreSQL (Metadata) & ChromaDB (Vector Embeddings)
-*   **AI Engine**: Ollama (Local) & Groq (Cloud)
-*   **PDF Engine**: PyMuPDF (fitz)
-*   **Frontend**: Vanilla HTML5, CSS3, JavaScript
+**AI-Qgen** has evolved into a robust, high-performance system for managing legacy question banks and generating professional university-grade examination papers. It completely bypasses complex AI generation in favor of a reliable, human-curated **Bulk CSV Import** pipeline.
 
 ---
 
 ## 🏗️ System Architecture
-#PDF_Extraction ➔ #Vector_Indexing ➔ #RAG_Retrieval ➔ #LLM_Generation ➔ #Bilingual_Transformation
+The application is built on a lightweight, decoupled architecture optimized for speed and reliability.
+
+### 🛠️ Tech Stack
+*   **Backend**: FastAPI (Python 3.11+)
+*   **Database**: PostgreSQL (Relational Data)
+*   **ORM & Migrations**: SQLAlchemy & Alembic
+*   **Frontend**: Vanilla HTML5, CSS3, JavaScript
+*   **Document Generation**: `python-docx`
 
 ### 📂 File Structure & Responsibilities
-*   **`backend/main.py`**: The application heart. Configures FastAPI, CORS, and mounts the API routers.
-*   **`backend/routers.py`**: The orchestrator. Handles HTTP requests and manages the flow between PDF extraction, Vector storage, and AI generation.
-*   **`backend/models.py`**: Defines the SQL schema for Subjects, Questions, and Papers using SQLAlchemy.
-*   **`backend/services/pdf_extractor.py`**: High-efficiency PDF parser. Uses iterative streaming to handle 400+ pages without RAM spikes.
-*   **`backend/services/vector_db.py`**: Manages the **ChromaDB** instance. Handles persistent storage and semantic similarity search.
-*   **`backend/services/llm_service.py`**: The AI logic. Formulates RAG prompts and manages bilingual output (English/Hindi) using Ollama/Groq.
-*   **`backend/services/paper_generator.py`**: Selects and filters questions from the database to build a balanced exam paper.
-*   **`backend/services/exporter.py`**: Converts structured JSON data into professional Microsoft Word (`.docx`) files.
+*   **`backend/main.py`**: The application heart. Configures FastAPI, CORS, and auto-generates tables if missing.
+*   **`backend/routers.py`**: The orchestrator. Handles HTTP requests for Subject management, CSV parsing, and Paper generation.
+*   **`backend/models.py`**: Defines the SQL schema for Subjects, Questions, Examinations, and Papers.
+*   **`backend/services/paper_generator.py`**: The selection engine. Uses intelligent anti-repetition logic (`usage_count`) to select fresh questions for every new exam.
+*   **`backend/services/exporter.py`**: The formatting engine. Converts selected questions into perfectly formatted Microsoft Word (`.docx`) files with official headers, watermarks, and bilingual layouts.
 
 ---
 
-## 🔄 The Data Transformation Workflow
+## 🔄 How It Works
 
-### 1. Ingestion Strategy (#Chunking)
-When a PDF is uploaded, the text is not stored as one giant block. It is broken into **Semantic Chunks** (approx. 1500 characters) with a **15% overlap**. This overlap ensures that concepts split across two pages are not lost.
+The system operates on a streamlined 3-step workflow:
 
-### 2. Retrieval Strategy (#Retriever)
-Instead of the AI reading the whole book, the system performs a **Vector Search**:
-- **Query**: "Generate MCQ about Photosynthesis."
-- **Search**: ChromaDB finds the top 3 most relevant chunks of text using the `all-MiniLM-L6-v2` embedding model.
-- **Result**: Only those specific pages are sent to the AI.
+### 1. 📚 Subject Registration
+Users create a "bucket" for their questions by registering a Subject (e.g., *Software Engineering, CS-501*).
 
-### 3. Generation Strategy (#LLM)
-The system uses a **Bilingual Prompting** strategy:
-- **Input**: Context Chunks + Strict JSON Schema.
-- **Transformation**: The model processes the English context and generates a pair: `{question_en, question_hi}`.
-- **Strictness**: Options for MCQs are enforced in `English / Hindi` format to ensure readability for all students.
+### 2. 📥 Bulk CSV Import
+Teachers or administrators format their legacy question banks using the system's strict CSV template. 
+*   **Bilingual Fallback:** If Hindi translations are missing, the backend automatically injects `[Hindi Missing]` to preserve the layout structure.
+*   **JSON Packing:** Multiple choice options (A, B, C, D) are automatically serialized into a single JSON column in PostgreSQL to maintain schema cleanliness.
+
+### 3. 📝 Exam Generation
+When an exam is requested, the system:
+1. Queries the PostgreSQL database for the specific subject.
+2. Filters out questions that have been used recently.
+3. Randomly selects the required number of questions per section.
+4. Updates the `usage_count` so those questions aren't repeated in the next exam.
+5. Generates a `.docx` file and Answer Key.
 
 ---
 
 ## 🚀 Quick Setup Guide
 
-### 1️⃣ Environment
+### 1️⃣ Environment Setup
+Create a virtual environment and install the lightweight dependencies:
 ```powershell
 python -m venv venv
 .\venv\Scripts\activate
-pip install --no-cache-dir -r requirements.txt
+pip install -r requirements.txt
 ```
 
-### 2️⃣ Configuration
-Update your `.env` with:
+### 2️⃣ Database Configuration
+Create a `.env` file in the root directory and add your PostgreSQL credentials:
 ```env
-DATABASE_URL="postgresql://user:pass@localhost:5432/ai_qgen"
-USE_OLLAMA=True
-OLLAMA_MODEL=qwen2.5:3b
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/ai_qgen"
 ```
 
-### 3️⃣ Run
-*   **Backend**: `uvicorn backend.main:app --reload`
-*   **Frontend**: `python -m http.server 3000 --directory frontend`
+### 3️⃣ Run Database Migrations (Alembic)
+To ensure your PostgreSQL database schema is perfectly synced with the models:
+```powershell
+# Create the initial tables and apply migrations
+alembic upgrade head
+```
+*(Note: `main.py` also contains a fallback to auto-create tables if Alembic is bypassed for quick local testing).*
 
+### 4️⃣ Run the Application
+You will need two terminals to run the system:
 
+**Terminal 1 (Backend):**
+```powershell
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+**Terminal 2 (Frontend):**
+```powershell
+cd frontend
+python -m http.server 3000
+```
+
+Open your browser to `http://localhost:3000` to access the dashboard!

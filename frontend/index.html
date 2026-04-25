@@ -68,60 +68,6 @@
             <div id="subjectStatus" class="status-msg"></div>
         </section>
 
-        <section class="glass-panel main-form">
-            <h2>Generate New Question Bank</h2>
-            <form id="genForm">
-                <div class="input-group">
-                    <label>Select Subject</label>
-                    <select id="subjectId" required>
-                        <option value="">Loading subjects...</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>Upload Syllabus (PDF)</label>
-                    <input type="file" id="syllabusPdf" accept=".pdf">
-                </div>
-                <div class="input-group">
-                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>Question Requirements (Target Quantities)</span>
-                        <button type="button" id="addGenReqBtn" class="btn outline-btn" style="padding: 2px 8px; font-size: 0.8rem;">+ Add Type</button>
-                    </label>
-                    <div id="genTypesContainer" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
-                        <!-- Dynamic gen types go here -->
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label>Difficulty</label>
-                    <select id="difficulty">
-                        <option value="Easy">Easy</option>
-                        <option value="Medium" selected>Medium</option>
-                        <option value="Hard">Hard</option>
-                    </select>
-                </div>
-
-                <div class="input-group" style="display: flex; gap: 15px; margin-top: 10px;">
-                    <div style="flex: 1;">
-                        <label>AI Provider</label>
-                        <select id="aiProvider">
-                            <option value="groq">Groq (Cloud)</option>
-                            <option value="gemini">Gemini (Cloud)</option>
-                            <option value="ollama">Ollama (Local)</option>
-                        </select>
-                    </div>
-                    <div style="flex: 1;">
-                        <label>AI Model</label>
-                        <select id="aiModel"></select>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn primary-btn" style="margin-top: 20px;">
-                    <span class="btn-text">Generate Questions (AI)</span>
-                    <span class="loader hidden"></span>
-                </button>
-            </form>
-            <div id="genStatus" class="status-msg"></div>
-        </section>
-
         <!-- CSV Importer Section -->
         <section class="glass-panel main-form" style="margin-top: 20px;">
             <h2>Import External Questions (CSV)</h2>
@@ -135,8 +81,8 @@
                 <div class="input-group">
                     <label>Upload Question Bank (.csv)</label>
                     <input type="file" id="csvFile" accept=".csv" required>
-                    <small style="display: block; margin-top: 5px; color: rgba(255,255,255,0.6);">
-                        Must contain headers: Question_Type, Question_EN, Answer_EN. <a href="#" id="downloadTemplate" style="color: #4CAF50;">Download Template</a>
+                    <small style="display: block; margin-top: 5px;">
+                        <a href="question_template.csv" download="question_template.csv" style="color: #4CAF50;">📥 Download Template</a>
                     </small>
                 </div>
                 <button type="submit" class="btn outline-btn" style="margin-top: 10px;">
@@ -157,7 +103,7 @@
                     </div>
                     <div style="flex: 2;">
                         <label>Exam Title (Prints on Header)</label>
-                        <input type="text" id="paperExamTitle" placeholder="e.g. Mid Term" required style="width: 100%;">
+                        <input type="text" id="paperExamTitle" placeholder="e.g. EXAMINATION, 2025" required style="width: 100%;">
                     </div>
                     <div style="flex: 1;">
                         <label>Exam Type</label>
@@ -172,13 +118,20 @@
                 <div id="paperAnalyticsPreview" class="hidden" style="margin-bottom: 20px; border: 1px dashed var(--glass-border); padding: 15px; border-radius: 12px; background: rgba(255,255,255,0.02);">
                     <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
                         <span>Question Pool Availability</span>
-                        <span id="paperSubjectHealth" class="status-indicator" style="font-size: 0.65rem;">Unknown</span>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span id="paperSubjectHealth" class="status-indicator" style="font-size: 0.65rem;">Unknown</span>
+                            <button type="button" id="resetPoolBtn" class="btn outline-btn" style="padding: 2px 10px; font-size: 0.7rem; border-color: #f59e0b; color: #f59e0b;">🔄 Reset Pool</button>
+                        </div>
                     </div>
                     <!-- Header-style Stats -->
                     <div class="subject-health-header" style="padding: 10px; margin-bottom: 15px; background: rgba(0,0,0,0.1);">
                         <div class="health-stat">
                             <span class="val" id="paperTotalPool" style="font-size: 1.1rem;">0</span>
                             <span class="lbl" style="font-size: 0.65rem;">Total Pool</span>
+                        </div>
+                        <div class="health-stat">
+                            <span class="val" id="paperFreshCount" style="font-size: 1.1rem; color: #4ade80;">0</span>
+                            <span class="lbl" style="font-size: 0.65rem;">Fresh</span>
                         </div>
                         <div class="health-stat">
                             <span class="val" id="paperTotalUsed" style="font-size: 1.1rem;">0</span>

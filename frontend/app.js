@@ -48,108 +48,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    const genForm = document.getElementById("genForm");
-    const aiProvider = document.getElementById("aiProvider");
-    const aiModel = document.getElementById("aiModel");
-
-    // Fetch models on load
-    fetchModels(aiProvider.value);
-
-    aiProvider.addEventListener("change", () => {
-        fetchModels(aiProvider.value);
-    });
-
-    const genTypesContainer = document.getElementById("genTypesContainer");
-    const addGenReqBtn = document.getElementById("addGenReqBtn");
-
-    function addGenRequirement() {
-        const div = document.createElement("div");
-        div.className = "gen-type-item";
-        div.style.display = "flex";
-        div.style.gap = "10px";
-        div.innerHTML = `
-            <select class="gt-select" style="flex: 2;">
-                <option value="Mixed">Mixed (All Types)</option>
-                <option value="MCQ">MCQ (Multiple Choice)</option>
-                <option value="FIB">Fill in the Blanks</option>
-                <option value="T/F">True / False</option>
-                <option value="SA">Short Answer</option>
-                <option value="LA">Long Answer</option>
-                <option value="CASE">Case-Based</option>
-            </select>
-            <input type="number" class="gt-num" value="10" min="1" max="300" style="flex: 1;" required>
-            <button type="button" class="btn outline-btn" style="padding: 0 10px; border-color: #ef4444; color: #ef4444;" onclick="this.parentElement.remove()">X</button>
-        `;
-        genTypesContainer.appendChild(div);
-    }
-
-    addGenReqBtn.addEventListener("click", addGenRequirement);
-    addGenRequirement(); // Auto add first
-
-    genForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const subjectId = document.getElementById("subjectId").value;
-        const pdfFile = document.getElementById("syllabusPdf").files[0];
-        const difficulty = document.getElementById("difficulty").value;
-        const provider = aiProvider.value;
-        const modelName = aiModel.value;
-
-        const status = document.getElementById("genStatus");
-        const btn = genForm.querySelector(".primary-btn");
-        const loader = btn.querySelector(".loader");
-        const btnText = btn.querySelector(".btn-text");
-
-        if (!subjectId) {
-            alert("Subject required!");
-            return;
-        }
-
-        // Gather gen requirements
-        const typeConfigs = [];
-        const genItems = genTypesContainer.querySelectorAll(".gen-type-item");
-        genItems.forEach(item => {
-            const qt = item.querySelector(".gt-select").value;
-            const nq = item.querySelector(".gt-num").value;
-            typeConfigs.push({ q_type: qt, num_q: parseInt(nq) });
-        });
-
-        if (typeConfigs.length === 0) {
-            alert("Please add at least one question requirement type.");
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append("file", pdfFile);
-        formData.append("provider", provider);
-        formData.append("model_name", modelName);
-        formData.append("q_types_config", JSON.stringify(typeConfigs));
-        formData.append("difficulty", difficulty);
-
-        btnText.textContent = `Processing with ${modelName}...`;
-        loader.classList.remove("hidden");
-        status.textContent = "";
-
-        try {
-            const res = await fetch(`${API_BASE}/generate/from-pdf/?subject_id=${subjectId}`, {
-                method: "POST",
-                body: formData
-            });
-            const data = await res.json();
-            if (res.ok) {
-                status.style.color = "#4ade80";
-                status.textContent = "Success: " + data.message;
-            } else {
-                throw new Error(data.detail || "Server Error");
-            }
-        } catch (err) {
-            status.style.color = "#f87171";
-            status.textContent = "Error: " + err.message;
-        } finally {
-            btnText.textContent = "Generate Questions (AI)";
-            loader.classList.add("hidden");
-        }
-    });
-
     // CSV Import Form Handler
     const importCsvForm = document.getElementById("importCsvForm");
     importCsvForm.addEventListener("submit", async (e) => {
@@ -195,21 +93,25 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Download Template Handler
-    const downloadTemplate = document.getElementById("downloadTemplate");
-    downloadTemplate.addEventListener("click", (e) => {
-        e.preventDefault();
-        const headers = "Question_Type,Difficulty,Question_EN,Question_HI,Option_A,Option_B,Option_C,Option_D,Answer_EN,Answer_HI\n";
-        const sample = "MCQ,Medium,What is the capital of France?,फ्रांस की राजधानी क्या है?,Paris / पेरिस,London / लंदन,Berlin / बर्लिन,Madrid / मैड्रिड,Paris,पेरिस\n";
-        const blob = new Blob([headers + sample], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", "question_import_template.csv");
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    // Reset Pool Button Handler
+    const resetPoolBtn = document.getElementById("resetPoolBtn");
+    resetPoolBtn.addEventListener("click", async () => {
+        const subId = document.getElementById("paperSubjectId").value;
+        if (!subId) { alert("Please select a subject first."); return; }
+        if (!confirm("This will reset ALL question usage counts for this subject. All questions will be marked as fresh. Continue?")) return;
+        try {
+            const res = await fetch(`${API_BASE}/subjects/${subId}/reset-pool/`, { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                // Re-trigger the analytics refresh
+                document.getElementById("paperSubjectId").dispatchEvent(new Event("change"));
+            } else {
+                throw new Error(data.detail);
+            }
+        } catch (err) {
+            alert("Error: " + err.message);
+        }
     });
 
     const paperForm = document.getElementById("paperForm");
@@ -485,6 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let totalLimit = 0;
         let totalHeld = 0;
+        let totalFresh = 0;
 
         const typeLabels = {
             "MCQ": "Multiple Choice (MCQs)",
@@ -498,6 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
         Object.entries(data.breakdown).forEach(([type, stats]) => {
             totalLimit += stats.total;
             totalHeld += stats.used;
+            totalFresh += (stats.fresh || (stats.total - stats.used));
 
             if (stats.total > 0) {
                 const perc = (stats.used / stats.total) * 100;
@@ -523,7 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="status-indicator ${statusClass}" style="font-size: 0.55rem; padding: 2px 6px;">${statusText}</span>
                     </div>
                     <div style="margin-bottom: 8px; font-weight: 600; color: var(--primary); font-size: 0.85rem;">
-                        ${stats.used} / ${stats.total} <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">(${remaining} remaining)</span>
+                        <span style="color: #4ade80;">${remaining} fresh</span> / ${stats.total} total <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 400;">(${stats.used} used)</span>
                     </div>
                     <div class="progress-container" style="height: 6px; margin-bottom: 6px;">
                         <div class="progress-bar" style="width: ${perc}%; background: ${perc > 80 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--secondary))'};"></div>
@@ -537,6 +441,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const overall = totalLimit > 0 ? (totalHeld / totalLimit) * 100 : 0;
 
         document.getElementById("paperTotalPool").textContent = totalLimit;
+        document.getElementById("paperFreshCount").textContent = totalFresh;
         document.getElementById("paperTotalUsed").textContent = totalHeld;
         document.getElementById("paperOverallConsumption").textContent = overall.toFixed(1) + "%";
 
@@ -581,7 +486,7 @@ async function loadAnalytics(subjectCode) {
             grandTotal += stats.total;
             grandUsed += stats.used;
 
-            const remaining = stats.total - stats.used;
+            const remaining = stats.fresh || (stats.total - stats.used);
             const perc = stats.total > 0 ? ((stats.used / stats.total) * 100).toFixed(0) : 0;
 
             // Determine Status
@@ -603,7 +508,7 @@ async function loadAnalytics(subjectCode) {
                     <span class="status-indicator ${statusClass}">${statusText}</span>
                 </div>
                 <div style="margin-bottom: 10px; font-weight: 600; color: var(--primary);">
-                    ${stats.used} / ${stats.total} <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">(${remaining} remaining)</span>
+                    <span style="color: #4ade80;">${remaining} fresh</span> / ${stats.total} total <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">(${stats.used} used)</span>
                 </div>
                 <div class="progress-container">
                     <div class="progress-bar" style="width: ${perc}%; background: ${perc > 80 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--secondary))'};"></div>
@@ -634,19 +539,16 @@ async function loadSubjects() {
         }
         const subjects = await res.json();
 
-        const sel1 = document.getElementById("subjectId");
         const sel2 = document.getElementById("paperSubjectId");
         const sel3 = document.getElementById("analyticsSubjectFilter");
         const sel4 = document.getElementById("importSubjectId");
 
-        sel1.innerHTML = '<option value="">Select a subject</option>';
         sel2.innerHTML = '<option value="">Select a subject</option>';
         sel3.innerHTML = '<option value="">Select a subject</option>';
         if (sel4) sel4.innerHTML = '<option value="">Select a subject</option>';
 
         subjects.forEach(sub => {
             const opt = `<option value="${sub.id}">${sub.subject_code} - ${sub.name}</option>`;
-            sel1.innerHTML += opt;
             sel2.innerHTML += opt;
             if (sel4) sel4.innerHTML += opt;
 
@@ -660,26 +562,4 @@ async function loadSubjects() {
 
 
 
-async function fetchModels(provider) {
-    const aiModel = document.getElementById("aiModel");
-    aiModel.innerHTML = '<option value="">Loading models...</option>';
-    try {
-        const res = await fetch(`${API_BASE}/llm/models/?provider=${provider}`);
-        const models = await res.json();
-        aiModel.innerHTML = "";
-        models.forEach(m => {
-            const opt = document.createElement("option");
-            opt.value = m.id;
-            opt.textContent = m.name;
-            aiModel.appendChild(opt);
-        });
-
-        // Auto-select first model if available
-        if (models.length > 0 && !aiModel.value) {
-            aiModel.value = models[0].id;
-        }
-    } catch (err) {
-        aiModel.innerHTML = '<option value="">Error loading models</option>';
-        console.error("Failed to fetch models:", err);
-    }
-}
+// AI fetchModels removed
